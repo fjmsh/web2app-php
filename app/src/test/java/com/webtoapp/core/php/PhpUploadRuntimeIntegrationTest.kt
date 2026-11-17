@@ -625,7 +625,7 @@ class PhpUploadRuntimeIntegrationTest {
                     'is_uploaded_file' => is_uploaded_file(${'$'}f['tmp_name']),
                 ];
                 if (${'$'}destDir !== null && ${'$'}f['error'] === UPLOAD_ERR_OK) {
-                    ${'$'}dest = ${'$'}destDir . '/' . bin2hex(random_bytes(6)) . '-' . basename(${'$'}f['name']);
+                    ${'$'}dest = ${'$'}destDir . '/' . bin2hex(random_bytes(8)) . '.upload';
                     error_clear_last();
                     ${'$'}r['move_success'] = @move_uploaded_file(${'$'}f['tmp_name'], ${'$'}dest);
                     ${'$'}r['move_error'] = error_get_last()['message'] ?? null;
