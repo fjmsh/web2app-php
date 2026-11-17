@@ -87,6 +87,24 @@ jobs:
           "$wrapper" -n -r 'echo PHP_VERSION, " request_parse_body=", var_export(function_exists("request_parse_body"), true), PHP_EOL;'
           echo "PHP_BINARY=$wrapper" >> "$GITHUB_ENV"
 
+      - name: Smoke-test the Android PHP built-in server
+        run: |
+          www="$RUNNER_TEMP/php-smoke"
+          mkdir -p "$www"
+          echo '<?php echo PHP_SAPI;' > "$www/index.php"
+          for workers in "" 6; do
+            echo "== PHP_CLI_SERVER_WORKERS='${workers}'"
+            PHP_CLI_SERVER_WORKERS="$workers" "$PHP_BINARY" -n -d display_errors=stderr -d display_startup_errors=On \
+              -S 127.0.0.1:18089 -t "$www" > "$www/server.log" 2>&1 &
+            pid=$!
+            sleep 5
+            curl -sS -m 10 http://127.0.0.1:18089/ || true
+            echo
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null; echo "exit=$?"
+            cat "$www/server.log"
+          done
+
       - name: Run PHP runtime tests against the Android binary
         run: |
           ./gradlew --no-daemon --no-configuration-cache \

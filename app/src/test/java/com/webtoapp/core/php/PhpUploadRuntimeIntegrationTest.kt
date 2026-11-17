@@ -432,17 +432,26 @@ class PhpUploadRuntimeIntegrationTest {
         val process = builder.start()
         servers += process
         val log = StringBuffer()
-        Thread {
+        val reader = Thread {
             runCatching { process.inputStream.bufferedReader().forEachLine { log.appendLine(it) } }
         }.apply { isDaemon = true; start() }
 
         val base = "http://127.0.0.1:$port"
-        repeat(100) {
-            if (!process.isAlive) error("php server exited: $log")
+        repeat(150) {
+            if (!process.isAlive) {
+                reader.join(2000)
+                error("php server exited with ${process.exitValue()}: ${serverDiagnostics(command, log)}")
+            }
             if (runCatching { get("$base/__health").code == 200 }.getOrDefault(false)) return base
             Thread.sleep(100)
         }
-        error("php server did not become ready: $log")
+        error("php server did not become ready: ${serverDiagnostics(command, log)}")
+    }
+
+    private fun serverDiagnostics(command: List<String>, log: CharSequence): String {
+        val errorLog = File(context.cacheDir, "php_app_errors.log")
+        val logged = if (errorLog.isFile) errorLog.readText().takeLast(4000) else "(no php_app_errors.log)"
+        return "command=$command\noutput=$log\nerror_log=$logged"
     }
 
     private fun phpAppCommand(port: Int, router: String): List<String> {
