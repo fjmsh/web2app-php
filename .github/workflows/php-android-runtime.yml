@@ -1,9 +1,6 @@
 name: Build Android PHP runtime
 
 on:
-  push:
-    paths:
-      - .github/workflows/php-android-runtime.yml
   workflow_dispatch:
     inputs:
       publish:
