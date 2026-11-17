@@ -49,7 +49,7 @@ jobs:
         run: |
           sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
           sudo apt-get update
-          sudo apt-get install -y qemu-user-static
+          sudo apt-get install -y qemu-user
 
       - name: Fetch the pinned PHP binary that generated APKs embed
         run: |
@@ -61,8 +61,9 @@ jobs:
           curl -fsSL -o "$RUNNER_TEMP/android-php/php.tar.gz" "$url"
           echo "$sha  $RUNNER_TEMP/android-php/php.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/android-php/php.tar.gz" -C "$RUNNER_TEMP/android-php"
+          qemu=$(command -v qemu-aarch64-static || command -v qemu-aarch64)
           wrapper="$RUNNER_TEMP/android-php/php"
-          printf '#!/bin/sh\nexec qemu-aarch64-static "%s" "$@"\n' "$RUNNER_TEMP/android-php/bin/php7/bin/php" > "$wrapper"
+          printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$qemu" "$RUNNER_TEMP/android-php/bin/php7/bin/php" > "$wrapper"
           chmod +x "$wrapper"
           "$wrapper" -n -v
           "$wrapper" -n -r 'echo PHP_VERSION, " request_parse_body=", var_export(function_exists("request_parse_body"), true), PHP_EOL;'
