@@ -37,7 +37,7 @@ object WordPressDependencyManager {
         "https://github.com/fjmsh/web2app-priv/releases/download/$PHP_RUNTIME_RELEASE/PHP-$PHP_VERSION-Android-arm64-WebToApp.tar.gz"
 
     const val PHP_TARBALL_SHA256 =
-        "PENDING_RUNTIME_BUILD"
+        "6c9edef600c51f29bad1d5739197142976e6be900b29bfd89f00ddb2046f5c2b"
 
     private const val PHP_RUNTIME_MARKER = ".runtime_sha256"
 
