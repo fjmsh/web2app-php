@@ -630,6 +630,7 @@ class PhpUploadRuntimeIntegrationTest {
                     ${'$'}r['move_success'] = @move_uploaded_file(${'$'}f['tmp_name'], ${'$'}dest);
                     ${'$'}r['move_error'] = error_get_last()['message'] ?? null;
                     ${'$'}r['dest'] = ${'$'}dest;
+                    clearstatcache();
                     ${'$'}r['tmp_exists_after_move'] = is_file(${'$'}f['tmp_name']);
                     if (${'$'}r['move_success']) {
                         ${'$'}r['sha256'] = hash_file('sha256', ${'$'}dest);
