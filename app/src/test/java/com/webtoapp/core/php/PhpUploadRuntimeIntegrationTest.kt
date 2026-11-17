@@ -380,6 +380,18 @@ class PhpUploadRuntimeIntegrationTest {
     }
 
     @Test
+    fun `session data written inside functions persists across requests`() {
+        val base = startServer()
+        val first = get("$base/fnsession.php")
+        assertThat(json(first).get("m").asInt).isEqualTo(1)
+        val session = first.headers["Set-Cookie"].orEmpty()
+            .first { it.startsWith("PHPSESSID=") }.substringBefore(';')
+        val second = get("$base/fnsession.php", cookie = session)
+        assertWithMessage("first=${first.text} second=${second.text}")
+            .that(json(second).get("m").asInt).isEqualTo(2)
+    }
+
+    @Test
     fun `static files health and missing assets are served`() {
         val base = startServer()
         assertThat(get("$base/__health").text).isEqualTo("OK")
@@ -589,6 +601,7 @@ class PhpUploadRuntimeIntegrationTest {
         File(docRoot, "forge.php").writeText(FORGE_PHP)
         File(docRoot, "json.php").writeText(JSON_PHP)
         File(docRoot, "index.php").writeText(INDEX_PHP)
+        File(docRoot, "fnsession.php").writeText(FN_SESSION_PHP)
         File(docRoot, "redirect.php").writeText("<?php header('Location: /target'); echo 'moved';")
         File(docRoot, "fail.php").writeText("<?php throw new RuntimeException('boom');")
         File(docRoot, "style.css").writeText("body{color:red}")
@@ -680,6 +693,18 @@ class PhpUploadRuntimeIntegrationTest {
                 'script_name' => ${'$'}_SERVER['SCRIPT_NAME'],
                 'has_request_parse_body' => function_exists('request_parse_body'),
             ]);
+        """.trimIndent()
+
+        val FN_SESSION_PHP = """
+            <?php
+            session_start();
+            function bump(): int
+            {
+                ${'$'}_SESSION['m'] = (${'$'}_SESSION['m'] ?? 0) + 1;
+                return ${'$'}_SESSION['m'];
+            }
+            header('Content-Type: application/json');
+            echo json_encode(['m' => bump()]);
         """.trimIndent()
 
         val INDEX_PHP = """

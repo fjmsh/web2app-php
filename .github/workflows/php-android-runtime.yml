@@ -27,7 +27,7 @@ env:
 
 jobs:
   build:
-    name: Cross-compile PHP for Android arm64 without pmmpthread
+    name: Cross-compile PHP for Android arm64 without pmmpthread, with sessions
     if: ${{ !contains(github.event.head_commit.message, '[reuse-build:') }}
     runs-on: ubuntu-22.04
     timeout-minutes: 240
@@ -69,15 +69,17 @@ jobs:
           make install
           mv ./output "${{ github.workspace }}/compiler"
 
-      - name: Remove pmmpthread from the configure flags
+      - name: Remove pmmpthread and enable sessions in the configure flags
         working-directory: php-binaries
         run: |
-          grep -qx -- '--enable-pmmpthread \\' compile.sh
-          sed -i '/^--enable-pmmpthread \\$/d' compile.sh
-          if grep -q -- '--enable-pmmpthread' compile.sh; then
-            echo "::error::pmmpthread is still enabled"
-            exit 1
-          fi
+          for flag in --enable-pmmpthread --disable-session; do
+            grep -qx -- "$flag \\\\" compile.sh
+            sed -i "/^$flag \\\\\$/d" compile.sh
+            if grep -q -- "$flag" compile.sh; then
+              echo "::error::$flag is still in compile.sh"
+              exit 1
+            fi
+          done
           grep -q '"'"$PHP_VERSION_FULL"'"' compile.sh
 
       - name: Compile PHP
@@ -169,7 +171,7 @@ jobs:
             echo "::error::pmmpthread is still compiled in"
             exit 1
           fi
-          for ext in pdo_sqlite sqlite3 openssl curl mbstring json zlib; do
+          for ext in pdo_sqlite sqlite3 openssl curl mbstring json zlib session; do
             grep -qi "^$ext$" modules.txt || { echo "::error::missing extension $ext"; exit 1; }
           done
           test "$("$wrapper" -n -r 'echo PHP_VERSION;')" = "$PHP_VERSION_FULL"
@@ -254,7 +256,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           sha=$(cut -d' ' -f1 "$TARBALL.sha256")
-          notes="PHP $PHP_VERSION_FULL for Android arm64, built with pmmp/PHP-Binaries@$PHP_BINARIES_COMMIT and musl-cross-make@$MUSL_CROSS_MAKE_VERSION, configured without pmmpthread so the cli-server SAPI starts. SHA-256: $sha"
+          notes="PHP $PHP_VERSION_FULL for Android arm64, built with pmmp/PHP-Binaries@$PHP_BINARIES_COMMIT and musl-cross-make@$MUSL_CROSS_MAKE_VERSION, configured without pmmpthread so the cli-server SAPI starts, and with the session extension. SHA-256: $sha"
           gh release create "$RUNTIME_TAG" "$TARBALL" "$TARBALL.sha256" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \

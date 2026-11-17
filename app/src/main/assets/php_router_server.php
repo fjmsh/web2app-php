@@ -171,13 +171,13 @@ if (!function_exists('session_start')) {
         $GLOBALS['__session_id'] = $sid;
         $GLOBALS['__session_file'] = $sessionDir . '/sess_' . $sid;
 
-        $_SESSION = [];
+        $GLOBALS['_SESSION'] = [];
         if (is_file($GLOBALS['__session_file'])) {
             $data = @file_get_contents($GLOBALS['__session_file']);
             if ($data !== false) {
                 $decoded = json_decode($data, true);
                 if (is_array($decoded)) {
-                    $_SESSION = $decoded;
+                    $GLOBALS['_SESSION'] = $decoded;
                 }
             }
         }
@@ -194,7 +194,7 @@ if (!function_exists('session_start')) {
         if ($GLOBALS['__session_file']) {
             @file_put_contents(
                 $GLOBALS['__session_file'],
-                json_encode($_SESSION ?? [], JSON_UNESCAPED_UNICODE),
+                json_encode($GLOBALS['_SESSION'] ?? [], JSON_UNESCAPED_UNICODE),
                 LOCK_EX
             );
         }
@@ -209,7 +209,7 @@ if (!function_exists('session_start')) {
 
     function session_destroy(): bool
     {
-        $_SESSION = [];
+        $GLOBALS['_SESSION'] = [];
         if ($GLOBALS['__session_file'] && is_file($GLOBALS['__session_file'])) {
             @unlink($GLOBALS['__session_file']);
         }
@@ -258,7 +258,7 @@ if (!function_exists('session_start')) {
 
     function session_unset(): bool
     {
-        $_SESSION = [];
+        $GLOBALS['_SESSION'] = [];
         return true;
     }
 }
