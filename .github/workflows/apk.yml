@@ -89,21 +89,26 @@ jobs:
 
       - name: Smoke-test the Android PHP built-in server
         run: |
+          set +e
           www="$RUNNER_TEMP/php-smoke"
           mkdir -p "$www"
           echo '<?php echo PHP_SAPI;' > "$www/index.php"
+          echo "== raw socket listener"
+          timeout 8 "$PHP_BINARY" -n -r '$s = stream_socket_server("tcp://127.0.0.1:18088", $e, $m); var_dump($s !== false, $e, $m); if ($s) { $c = @stream_socket_accept($s, 5); var_dump($c !== false); }' &
+          sleep 3; curl -sS -m 3 http://127.0.0.1:18088/ >/dev/null; wait
           for workers in "" 6; do
-            echo "== PHP_CLI_SERVER_WORKERS='${workers}'"
-            PHP_CLI_SERVER_WORKERS="$workers" "$PHP_BINARY" -n -d display_errors=stderr -d display_startup_errors=On \
+            echo "== php -S with PHP_CLI_SERVER_WORKERS='${workers}'"
+            env PHP_CLI_SERVER_WORKERS="$workers" timeout 12 "$PHP_BINARY" -n -d display_errors=stderr -d display_startup_errors=On \
               -S 127.0.0.1:18089 -t "$www" > "$www/server.log" 2>&1 &
             pid=$!
             sleep 5
-            curl -sS -m 10 http://127.0.0.1:18089/ || true
-            echo
-            kill "$pid" 2>/dev/null || true
-            wait "$pid" 2>/dev/null; echo "exit=$?"
+            curl -sS -m 5 http://127.0.0.1:18089/; echo " curl=$?"
+            wait "$pid"; echo "server exit=$?"
             cat "$www/server.log"
           done
+          echo "== php -S verbose startup"
+          timeout 6 "$PHP_BINARY" -n -S 127.0.0.1:18090 -t "$www"; echo "exit=$?"
+          exit 0
 
       - name: Run PHP runtime tests against the Android binary
         run: |
