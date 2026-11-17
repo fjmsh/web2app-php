@@ -199,6 +199,7 @@ jobs:
         run: sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Run PHP runtime tests against the new runtime
+        timeout-minutes: 25
         run: |
           ./gradlew --no-daemon --no-configuration-cache \
             -Dkotlin.compiler.execution.strategy=in-process \
