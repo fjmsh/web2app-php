@@ -70,13 +70,16 @@ jobs:
           sudo apt-get install -y qemu-user
 
       - name: Fetch the pinned PHP binary that generated APKs embed
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           deps=app/src/main/java/com/webtoapp/core/wordpress/WordPressDependencyManager.kt
           version=$(grep -oP 'const val PHP_VERSION = "\K[^"]+' "$deps")
+          release=$(grep -oP 'const val PHP_RUNTIME_RELEASE = "\K[^"]+' "$deps")
           sha=$(grep -A1 'PHP_TARBALL_SHA256 =' "$deps" | grep -oP '"\K[0-9a-f]{64}')
-          url="https://github.com/pmmp/PHP-Binaries/releases/download/pm5-php-${version}-latest/PHP-${version}-Android-arm64-PM5.tar.gz"
           mkdir -p "$RUNNER_TEMP/android-php"
-          curl -fsSL -o "$RUNNER_TEMP/android-php/php.tar.gz" "$url"
+          gh release download "$release" --repo "$GITHUB_REPOSITORY" \
+            --pattern "PHP-${version}-Android-arm64-WebToApp.tar.gz" --output "$RUNNER_TEMP/android-php/php.tar.gz"
           echo "$sha  $RUNNER_TEMP/android-php/php.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/android-php/php.tar.gz" -C "$RUNNER_TEMP/android-php"
           qemu=$(command -v qemu-aarch64-static || command -v qemu-aarch64)

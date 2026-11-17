@@ -78,7 +78,7 @@ class WordPressPhpRuntimeTest {
     }
 
     @Test
-    fun `php downloaded into app data dir is treated as ready when nativeLib is empty`() {
+    fun `php downloaded into app data dir is treated as ready when nativeLib is empty and runtime is current`() {
 
         val emptyNativeDir = File(context.cacheDir, "test-native-lib-empty").apply {
             deleteRecursively()
@@ -92,12 +92,36 @@ class WordPressPhpRuntimeTest {
             writeBytes(ByteArray(1024 * 1024 + 1) { 0 })
             setExecutable(true, false)
         }
+        File(WordPressDependencyManager.getPhpDir(context), ".runtime_sha256")
+            .writeText(WordPressDependencyManager.PHP_TARBALL_SHA256)
 
         try {
             assertThat(downloadedPhp.canExecute()).isTrue()
             assertThat(WordPressDependencyManager.isPhpReady(context)).isTrue()
             assertThat(WordPressDependencyManager.getPhpExecutablePath(context))
                 .isEqualTo(downloadedPhp.absolutePath)
+        } finally {
+            emptyNativeDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `previously downloaded php from another runtime build is not ready`() {
+        val emptyNativeDir = File(context.cacheDir, "test-native-lib-stale").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        context.applicationInfo.nativeLibraryDir = emptyNativeDir.absolutePath
+        val phpDir = WordPressDependencyManager.getPhpDir(context)
+        File(phpDir, "php").apply {
+            writeBytes(ByteArray(1024 * 1024 + 1) { 0 })
+            setExecutable(true, false)
+        }
+
+        try {
+            assertThat(WordPressDependencyManager.isPhpReady(context)).isFalse()
+            File(phpDir, ".runtime_sha256").writeText("d8867966340121f821591b9bb29c80a58ad77abd6cc8e0e44d1cbbb3aaedd70c")
+            assertThat(WordPressDependencyManager.isPhpReady(context)).isFalse()
         } finally {
             emptyNativeDir.deleteRecursively()
         }
