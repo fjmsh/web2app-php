@@ -15,6 +15,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GRADLE_CI_JVMARGS: -Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+
 concurrency:
   group: build-apk-${{ github.ref }}
   cancel-in-progress: false
@@ -28,6 +31,16 @@ jobs:
     steps:
       - name: Download code
         uses: actions/checkout@v6
+
+      - name: Add swap space
+        run: |
+          nproc
+          free -h
+          sudo fallocate -l 10G /swapfile.ci
+          sudo chmod 600 /swapfile.ci
+          sudo mkswap /swapfile.ci
+          sudo swapon /swapfile.ci
+          free -h
 
       - name: Prepare Java
         uses: actions/setup-java@v5
@@ -73,6 +86,8 @@ jobs:
         run: |
           ./gradlew --no-daemon --no-configuration-cache \
             -Dkotlin.compiler.execution.strategy=in-process \
+            -Dorg.gradle.jvmargs="$GRADLE_CI_JVMARGS" \
+            --max-workers=2 \
             -PskipShellTemplateSync=true \
             -PallowDebugSignedRelease=true \
             :app:testStandardDebugUnitTest \
@@ -100,6 +115,16 @@ jobs:
     steps:
       - name: Download code
         uses: actions/checkout@v6
+
+      - name: Add swap space
+        run: |
+          nproc
+          free -h
+          sudo fallocate -l 10G /swapfile.ci
+          sudo chmod 600 /swapfile.ci
+          sudo mkswap /swapfile.ci
+          sudo swapon /swapfile.ci
+          free -h
 
       - name: Prepare Java
         uses: actions/setup-java@v5
@@ -131,6 +156,8 @@ jobs:
           variant="Standard${BUILD_TYPE^}"
           ./gradlew --no-daemon --no-configuration-cache \
             -Dkotlin.compiler.execution.strategy=in-process \
+            -Dorg.gradle.jvmargs="$GRADLE_CI_JVMARGS" \
+            --max-workers=2 \
             -PallowDebugSignedRelease=true \
             ":app:assemble${variant}"
 
