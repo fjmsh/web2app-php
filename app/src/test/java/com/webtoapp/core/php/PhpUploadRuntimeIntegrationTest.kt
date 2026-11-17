@@ -3,6 +3,7 @@ package com.webtoapp.core.php
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import org.junit.After
@@ -366,7 +367,12 @@ class PhpUploadRuntimeIntegrationTest {
         val session = cookies.first { it.startsWith("PHPSESSID=") }.substringBefore(';')
 
         val second = get("$base/", cookie = session)
-        assertThat(json(second).get("n").asInt).isEqualTo(2)
+        val sessionDir = File(docRoot, ".sessions")
+        assertWithMessage(
+            "first=${first.text}\nsecond=${second.text}\ncookies=$cookies\n" +
+                "sessions=${sessionDir.listFiles().orEmpty().map { "${it.name}:${it.length()}" }}\n" +
+                serverDiagnostics(emptyList(), "")
+        ).that(json(second).get("n").asInt).isEqualTo(2)
 
         val redirect = get("$base/redirect.php")
         assertThat(redirect.code).isEqualTo(302)
@@ -687,6 +693,11 @@ class PhpUploadRuntimeIntegrationTest {
                 'n' => ${'$'}_SESSION['n'],
                 'uri' => ${'$'}_SERVER['REQUEST_URI'],
                 'script_name' => ${'$'}_SERVER['SCRIPT_NAME'],
+                'session_id' => session_id(),
+                'cookie' => ${'$'}_COOKIE['PHPSESSID'] ?? null,
+                'session_file' => ${'$'}GLOBALS['__session_file'] ?? null,
+                'polyfill' => function_exists('wta_session_polyfill_flush'),
+                'pid' => getmypid(),
             ]);
         """.trimIndent()
     }

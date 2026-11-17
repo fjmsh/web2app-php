@@ -55,21 +55,22 @@ function wta_router_prepare_request_body(): void
     $isMultipart = str_contains($contentType, 'multipart/form-data');
     $isUrlEncoded = str_contains($contentType, 'application/x-www-form-urlencoded');
     $requestChanged = false;
+    $parseBody = in_array($method, ['PUT', 'PATCH'], true) && ($isMultipart || $isUrlEncoded) && $_POST === [] && $_FILES === [];
+
+    if ($parseBody && function_exists('request_parse_body')) {
+        try {
+            [$_POST, $_FILES] = request_parse_body();
+            $requestChanged = true;
+        } catch (\Throwable $e) {
+            error_log('[RouterServer] request_parse_body failed: ' . $e->getMessage());
+        }
+    }
 
     $GLOBALS['__HTTP_RAW_BODY'] = $isMultipart ? '' : (string) file_get_contents('php://input');
 
-    if (in_array($method, ['PUT', 'PATCH'], true) && ($isMultipart || $isUrlEncoded) && $_POST === [] && $_FILES === []) {
-        if (function_exists('request_parse_body')) {
-            try {
-                [$_POST, $_FILES] = request_parse_body();
-                $requestChanged = true;
-            } catch (\Throwable $e) {
-                error_log('[RouterServer] request_parse_body failed: ' . $e->getMessage());
-            }
-        } elseif ($isUrlEncoded) {
-            parse_str($GLOBALS['__HTTP_RAW_BODY'], $_POST);
-            $requestChanged = true;
-        }
+    if ($parseBody && !$requestChanged && $isUrlEncoded) {
+        parse_str($GLOBALS['__HTTP_RAW_BODY'], $_POST);
+        $requestChanged = true;
     }
 
     if (in_array($method, ['POST', 'PUT', 'PATCH'], true)
