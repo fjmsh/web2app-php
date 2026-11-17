@@ -23,7 +23,7 @@ class WordPressPhpRuntimeTest {
     }
 
     @Test
-    fun `wordpress runtime disables native headers so router polyfill captures redirects and cookies`() {
+    fun `wordpress runtime launches the native cli-server sapi with native headers intact`() {
         val runtime = WordPressPhpRuntime(context)
         val method = WordPressPhpRuntime::class.java.getDeclaredMethod(
             "buildPhpCommand",
@@ -47,7 +47,11 @@ class WordPressPhpRuntimeTest {
             null
         ) as List<String>
 
-        assertThat(command).contains("disable_functions=header,headers_list,headers_sent,header_remove,setcookie,setrawcookie")
+        val router = File(context.cacheDir, "php_router_server.php").absolutePath
+        assertThat(command.none { it.startsWith("disable_functions=") }).isTrue()
+        assertThat(command.takeLast(5))
+            .containsExactly("-S", "127.0.0.1:18500", "-t", context.filesDir.absolutePath, router)
+            .inOrder()
     }
 
     @Test
