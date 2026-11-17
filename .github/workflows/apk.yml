@@ -32,15 +32,20 @@ jobs:
       - name: Download code
         uses: actions/checkout@v6
 
-      - name: Add swap space
+      - name: Free disk and add swap space
         run: |
           nproc
           free -h
-          sudo fallocate -l 10G /swapfile.ci
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/share/swift
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          sudo fallocate -l 6G /swapfile.ci
           sudo chmod 600 /swapfile.ci
           sudo mkswap /swapfile.ci
           sudo swapon /swapfile.ci
           free -h
+          df -h /
 
       - name: Prepare Java
         uses: actions/setup-java@v5
@@ -116,15 +121,20 @@ jobs:
       - name: Download code
         uses: actions/checkout@v6
 
-      - name: Add swap space
+      - name: Free disk and add swap space
         run: |
           nproc
           free -h
-          sudo fallocate -l 10G /swapfile.ci
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/share/swift
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          sudo fallocate -l 6G /swapfile.ci
           sudo chmod 600 /swapfile.ci
           sudo mkswap /swapfile.ci
           sudo swapon /swapfile.ci
           free -h
+          df -h /
 
       - name: Prepare Java
         uses: actions/setup-java@v5
