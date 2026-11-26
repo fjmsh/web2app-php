@@ -6930,15 +6930,14 @@ class WebViewManager(
                         this.responseURL = '';
                         this.status = 0;
                         this.statusText = '';
-                        this.timeout = 0;
-                        this.withCredentials = false;
+                        this.upload = this._xhr.upload;
                         this.onreadystatechange = null;
                         this.onload = null;
                         this.onerror = null;
                         this.onloadend = null;
 
                         var self = this;
-                        ['readystatechange', 'load', 'error', 'loadend', 'timeout', 'abort', 'progress'].forEach(function(name) {
+                        ['readystatechange', 'loadstart', 'load', 'error', 'loadend', 'timeout', 'abort', 'progress'].forEach(function(name) {
                             self._xhr.addEventListener(name, function(event) {
                                 self._syncFromNative();
                                 self._dispatch(name, event);
@@ -6946,16 +6945,6 @@ class WebViewManager(
                         });
                     }
 
-                    // responseText is readable only while the native type is '' or
-                    // 'text'; every other type makes that getter throw. Read the type
-                    // first instead of probing it with try/catch: a binary load then
-                    // never touches the throwing getter at all, rather than raising
-                    // and swallowing an InvalidStateError on all four
-                    // readystatechange transitions.
-                    // Replacing window.XMLHttpRequest drops the readyState constants that
-                    // live on the constructor. A page comparing
-                    // `xhr.readyState === XMLHttpRequest.DONE` would compare against
-                    // undefined and never treat the response as complete.
                     BridgedXHR.UNSENT = 0;
                     BridgedXHR.OPENED = 1;
                     BridgedXHR.HEADERS_RECEIVED = 2;
@@ -6967,15 +6956,35 @@ class WebViewManager(
                         var type = source.responseType || '';
                         this.readyState = source.readyState;
                         this.response = source.response;
-                        // No text form exists for binary/json/document, so keep the
-                        // property a stable empty string. A page that probes it gets a
-                        // value instead of an exception; the data is in `response`.
                         this.responseText = (type === '' || type === 'text')
                             ? (source.responseText || '')
                             : '';
                         this.responseURL = source.responseURL || this._url;
                         this.status = source.status || 0;
                         this.statusText = source.statusText || '';
+                    };
+
+                    BridgedXHR.prototype._bodyByteLength = function(body) {
+                        if (body === null || body === undefined) return null;
+                        if (typeof body === 'string') return new Blob([body]).size;
+                        if (typeof Blob !== 'undefined' && body instanceof Blob) return body.size;
+                        if (body instanceof ArrayBuffer) return body.byteLength;
+                        if (ArrayBuffer.isView(body)) return body.byteLength;
+                        if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
+                            return new Blob([body.toString()]).size;
+                        }
+                        return null;
+                    };
+
+                    BridgedXHR.prototype._dispatchUpload = function(type, loaded, total) {
+                        if (!this.upload || typeof ProgressEvent !== 'function') return;
+                        try {
+                            this.upload.dispatchEvent(new ProgressEvent(type, {
+                                lengthComputable: total !== null,
+                                loaded: loaded,
+                                total: total === null ? 0 : total
+                            }));
+                        } catch (e) { setTimeout(function() { throw e; }); }
                     };
 
                     BridgedXHR.prototype._dispatch = function(type, sourceEvent) {
@@ -6999,7 +7008,7 @@ class WebViewManager(
                             (this._method === 'GET' || this._method === 'HEAD'));
                         if (!bridgeable) {
                             this._native = true;
-                            return this._xhr.open(method, url, async, user, password);
+                            return this._xhr.open.apply(this._xhr, arguments);
                         }
                         this._native = false;
                         this._dispatch('readystatechange');
@@ -7026,8 +7035,17 @@ class WebViewManager(
                         if (this._native) return this._xhr.send(body);
                         if (this._async === false) throw new Error('Synchronous private network XHR is not supported');
                         var self = this;
+                        var hasBody = body !== null && body !== undefined;
+                        var uploadTotal = this._bodyByteLength(body);
+                        if (hasBody) this._dispatchUpload('loadstart', 0, uploadTotal);
                         nativeHttpRequest({ url: this._url, method: this._method, headers: this._headers, body: body })
                             .then(function(result) {
+                                if (hasBody) {
+                                    var sent = uploadTotal === null ? 0 : uploadTotal;
+                                    self._dispatchUpload('progress', sent, uploadTotal);
+                                    self._dispatchUpload('load', sent, uploadTotal);
+                                    self._dispatchUpload('loadend', sent, uploadTotal);
+                                }
                                 var headers = {};
                                 Object.keys(result.headers || {}).forEach(function(name) {
                                     headers[name.toLowerCase()] = String(result.headers[name]);
@@ -7055,6 +7073,10 @@ class WebViewManager(
                                 self._dispatch('load');
                                 self._dispatch('loadend');
                             }).catch(function(error) {
+                                if (hasBody) {
+                                    self._dispatchUpload('error', 0, uploadTotal);
+                                    self._dispatchUpload('loadend', 0, uploadTotal);
+                                }
                                 self.status = 0;
                                 self.statusText = '';
                                 self.readyState = 4;
@@ -7085,11 +7107,16 @@ class WebViewManager(
                         if (this._native) return this._xhr.overrideMimeType(mimeType);
                     };
 
-                    // responseType has to be forwarded to the native XHR. Without this
-                    // the wrapper only stores the value on itself, the underlying
-                    // request stays on the default text type, and every binary loader
-                    // (GLTFLoader, fetch->arraybuffer) silently receives a String —
-                    // which is exactly how a 62 MB GLB ends up in JSON.parse.
+                    ['timeout', 'withCredentials'].forEach(function(name) {
+                        Object.defineProperty(BridgedXHR.prototype, name, {
+                            configurable: true,
+                            get: function() { return this._xhr[name]; },
+                            set: function(value) {
+                                try { this._xhr[name] = value; } catch (e) { }
+                            }
+                        });
+                    });
+
                     Object.defineProperty(BridgedXHR.prototype, 'responseType', {
                         configurable: true,
                         get: function() { return this._responseType || ''; },
